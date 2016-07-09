@@ -33,8 +33,8 @@ def print_interfaces(interfaces):
 
 
 class Note(object):
-    def __init__(self, note_on, note_off, start_time=0):
-        self.time = note_on.time - start_time
+    def __init__(self, note_on, note_off):
+        self.time = note_on.time
         self.duration = note_off.time - note_on.time
         self.note = note_on.note
         self.velocity = note_on.velocity
@@ -47,6 +47,60 @@ class Note(object):
 
     def __str__(self):
         return '{0.time:.5f} {0.name}{0.octave} {0.velocity} [{0.duration:.3f}]'.format(self)
+
+
+class RecordPort(object):
+    def __init__(self, port, idle_time=5):
+        self.port = port
+        self.idle_time = idle_time
+
+        self._last_event = 0
+
+    def receive(self, block=True):
+        msg = self.port.receive(block=block)
+        if msg:
+            msg.time = time.perf_counter()
+            self._last_event = msg.time
+        return msg
+
+    def receive_first(self, type=None):
+        while True:
+            msg = self.receive()
+            if msg.type == type or type is None:
+                return msg
+
+    def is_idle(self):
+        return time.perf_counter() - self._last_event > self.idle_time
+
+    def __iter__(self):
+        msg = self.receive_first(type='note_on')
+        start_time = msg.time
+
+        msg.time = 0
+        yield msg
+
+        while not self.is_idle():
+            msg = self.receive(block=False)
+            if not msg:
+                continue
+
+            if msg.type == 'note_on' or msg.type == 'note_off':
+                msg.time -= start_time
+                yield msg
+
+
+def oneshot_record(port):
+    notes = []
+    active_notes = {}
+
+    for msg in port:
+        if msg.type == 'note_on':
+            active_notes[msg.note] = msg
+        elif msg.type == 'note_off':
+            on_msg = active_notes.pop(msg.note)
+            notes.append(Note(on_msg, msg))
+
+    return sorted(notes, key=lambda n: n.time)
 
 
 def pair_notes(notes):
@@ -100,34 +154,11 @@ if __name__ == '__main__':
     print('---')
     iface = prompt_interfaces(interfaces)
 
-    notes = []
-
     with mido.open_input(iface) as port:
-        msg = port.receive()
-
         print('recording...', end=' ')
-        msg.time = time.perf_counter()
-        start_time = msg.time
+        notes = oneshot_record(RecordPort(port))
+        print('done ({} notes)'.format(len(notes)))
 
-        active_notes = {}
-
-        # TODO: this assumes first event is note_on
-        active_notes[msg.note] = msg
-
-        while True:
-            for msg in port.iter_pending():
-                msg.time = time.perf_counter()
-                if msg.type == 'note_on':
-                    active_notes[msg.note] = msg
-                elif msg.type == 'note_off':
-                    note_on = active_notes.pop(msg.note)
-                    notes.append(Note(note_on, msg, start_time))
-
-            if time.perf_counter() - msg.time > 5:
-                print('done')
-                break
-
-    notes = sorted(notes, key=lambda n: n.time)
     pairs = pair_notes(notes)
     stats = pair_stats(pairs)
 
