@@ -3,6 +3,8 @@
 import time
 import mido
 
+from statistics import mean, pvariance
+
 TEMPO = 108
 BEAT_TIME = 60 / TEMPO
 
@@ -43,9 +45,6 @@ class Note(object):
     def is_pair(self, other, window=BEAT_TIME/4):
         return self.name == other.name and abs(self.time - other.time) < window
 
-    def __lt__(self, other):
-        return self.time < other.time
-
     def __str__(self):
         return '{0.time:.5f} {0.name}{0.octave} {0.velocity} [{0.duration:.3f}]'.format(self)
 
@@ -69,11 +68,31 @@ def pair_notes(notes):
             else:
                 other_note = None
 
-        pairs.append((note, other_note))
+        if other_note is not None:
+            if note.note < other_note.note:
+                pairs.append((note, other_note))
+            else:
+                pairs.append((other_note, note))
+        else:
+            print('dropped {}, no pair'.format(note))
+
 
     return pairs
 
 
+def pair_stats(pairs):
+    stats = []
+
+    expected_time = 0
+    for left, right in pairs:
+        stats.append({
+            'spread': right.time - left.time,
+            'r_offset': right.time - expected_time,
+            'l_offset': left.time - expected_time
+        })
+        expected_time += BEAT_TIME/4
+
+    return stats
 
 if __name__ == '__main__':
     interfaces = mido.get_input_names()
@@ -108,8 +127,19 @@ if __name__ == '__main__':
                 print('done')
                 break
 
-    notes = sorted(notes)
+    notes = sorted(notes, key=lambda n: n.time)
     pairs = pair_notes(notes)
+    stats = pair_stats(pairs)
 
-    for pair in pairs:
-        print('{} - {}'.format(*pair))
+    print()
+    print('avg spread: {}'.format(mean(s['spread'] for s in stats)))
+    print('avg right offset: {}'.format(mean(s['r_offset'] for s in stats)))
+    print('avg left offset: {}'.format(mean(s['l_offset'] for s in stats)))
+    print('---')
+
+    print('avg velocity: {}'.format(mean(n.velocity for n in notes)))
+    print('velocity variance: {}'.format(pvariance(n.velocity for n in notes)))
+    print('---')
+
+    print('avg duration: {} (target = {})'.format(mean(n.duration for n in notes), BEAT_TIME/4))
+    print('duration variance: {}'.format(pvariance(n.duration for n in notes)))
