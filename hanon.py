@@ -40,8 +40,7 @@ class Note(object):
         self.name = NOTE_NAMES[self.note % 12]
         self.octave = self.note // 12
 
-
-    def is_pair(self, other, window=BEAT_TIME/8):
+    def is_pair(self, other, window=BEAT_TIME/4):
         return self.name == other.name and abs(self.time - other.time) < window
 
     def __lt__(self, other):
