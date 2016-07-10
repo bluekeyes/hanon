@@ -21,7 +21,7 @@ def prompt_interfaces(interfaces):
 
         try:
             index = int(selection) - 1
-            if 0 < index < len(interfaces):
+            if 0 <= index < len(interfaces):
                 return interfaces[index]
         except ValueError:
             pass
