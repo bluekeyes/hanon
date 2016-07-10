@@ -163,14 +163,14 @@ if __name__ == '__main__':
     stats = pair_stats(pairs)
 
     print()
-    print('avg spread: {}'.format(mean(s['spread'] for s in stats)))
-    print('avg right offset: {}'.format(mean(s['r_offset'] for s in stats)))
-    print('avg left offset: {}'.format(mean(s['l_offset'] for s in stats)))
+    print('avg spread: {:.4f}'.format(mean(s['spread'] for s in stats)))
+    print('avg right offset: {:.4f}'.format(mean(s['r_offset'] for s in stats)))
+    print('avg left offset: {:.4f}'.format(mean(s['l_offset'] for s in stats)))
     print('---')
 
-    print('avg velocity: {}'.format(mean(n.velocity for n in notes)))
-    print('velocity variance: {}'.format(pvariance(n.velocity for n in notes)))
+    print('avg velocity: {:.2f}'.format(mean(n.velocity for n in notes)))
+    print('velocity variance: {:.2f}'.format(pvariance(n.velocity for n in notes)))
     print('---')
 
-    print('avg duration: {} (target = {})'.format(mean(n.duration for n in notes), BEAT_TIME/4))
-    print('duration variance: {}'.format(pvariance(n.duration for n in notes)))
+    print('avg duration: {:.4f} (target = {:.4f})'.format(mean(n.duration for n in notes), BEAT_TIME/4))
+    print('duration variance: {:.4f}'.format(pvariance(n.duration for n in notes)))
