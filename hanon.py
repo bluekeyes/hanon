@@ -105,33 +105,24 @@ def oneshot_record(port):
 
 def pair_notes(notes):
     pairs = []
-    used = set()
+    outliers = []
 
+    paired = set()
     for i, note in enumerate(notes):
-        if i in used:
+        if note in paired:
             continue
 
-        used.add(i)
-        for j, other_note in enumerate(notes[i+1:], start=i+1):
-            if j in used:
-                continue
-
-            if note.is_pair(other_note):
-                used.add(j)
-                break
+        try:
+            other = next(n for n in notes[i+1:] if n not in paired and note.is_pair(n))
+            paired.add(other)
+            if note.note < other.note:
+                pairs.append((note, other))
             else:
-                other_note = None
+                pairs.append((other, other))
+        except StopIteration:
+            outliers.append(note)
 
-        if other_note is not None:
-            if note.note < other_note.note:
-                pairs.append((note, other_note))
-            else:
-                pairs.append((other_note, note))
-        else:
-            print('dropped {}, no pair'.format(note))
-
-
-    return pairs
+    return (pairs, outliers)
 
 
 def pair_stats(pairs):
@@ -159,18 +150,23 @@ if __name__ == '__main__':
         notes = oneshot_record(RecordPort(port))
         print('done ({} notes)'.format(len(notes)))
 
-    pairs = pair_notes(notes)
+    pairs, outliers = pair_notes(notes)
     stats = pair_stats(pairs)
 
     print()
+    print('{} unpaired notes'.format(len(outliers)))
+    for note in outliers:
+        print('  {}'.format(note))
+
+    print('---')
     print('avg spread: {:.4f}'.format(mean(s['spread'] for s in stats)))
     print('avg right offset: {:.4f}'.format(mean(s['r_offset'] for s in stats)))
     print('avg left offset: {:.4f}'.format(mean(s['l_offset'] for s in stats)))
-    print('---')
 
+    print('---')
     print('avg velocity: {:.2f}'.format(mean(n.velocity for n in notes)))
     print('velocity variance: {:.2f}'.format(pvariance(n.velocity for n in notes)))
-    print('---')
 
+    print('---')
     print('avg duration: {:.4f} (target = {:.4f})'.format(mean(n.duration for n in notes), BEAT_TIME/4))
     print('duration variance: {:.4f}'.format(pvariance(n.duration for n in notes)))
