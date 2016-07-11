@@ -2,7 +2,9 @@
 
 import time
 import mido
+import json
 
+from itertools import accumulate
 from statistics import mean, pvariance
 
 TEMPO = 108
@@ -30,6 +32,57 @@ def print_interfaces(interfaces):
     print('Available interfaces:')
     for i, iface in enumerate(interfaces):
         print('  [{}]: {}'.format(i + 1, iface))
+
+
+def load_exercises():
+    def as_exercise(obj):
+        if 'scale' in obj and 'patterns' in obj:
+            return Exercise(SCALES[obj['scale']], obj['patterns'])
+        return obj
+
+    with open('exercises.json', 'r') as f:
+        return json.load(f, object_hook=as_exercise)
+
+
+class Scale(object):
+    def __init__(self, root, steps):
+        self.root = root
+        self.steps = steps
+        self.offsets = [0] + list(accumulate(steps))
+
+    def transpose(self, amount):
+        return Scale(self.root + amount, self.steps)
+
+    def __getitem__(self, index):
+        octave, note = divmod(index, len(self.steps))
+        return self.root + 12 * octave + self.offsets[note]
+
+
+SCALES = {
+    'Cmaj': Scale(0, [2, 2, 1, 2, 2, 2, 1])
+}
+
+
+class Exercise(object):
+    def __init__(self, scale, patterns):
+        self.scale = scale
+        self.patterns = patterns
+
+    def notes(self, octave=4):
+        scale = self.scale.transpose(12 * octave)
+        for pattern in self.patterns:
+            base = pattern['start']
+            for bar in range(pattern['bars']):
+                current = base + pattern['delta'] * bar
+                for delta in pattern['notes']:
+                    current += delta
+                    yield scale[current]
+
+    def fingers(self, hand='right'):
+        for pattern in self.patterns:
+            for bar in range(pattern['bars']):
+                for finger in pattern['fingers'][hand]:
+                    yield finger
 
 
 class Note(object):
