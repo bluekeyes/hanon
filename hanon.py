@@ -1,14 +1,11 @@
 #!/usr/bin/env python
 
-import time
-import mido
 import json
+import mido
+import time
 
 from itertools import accumulate
 from statistics import mean, pvariance
-
-TEMPO = 108
-BEAT_TIME = 60 / TEMPO
 
 NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
@@ -64,42 +61,95 @@ SCALES = {
 
 
 class Exercise(object):
-    def __init__(self, scale, patterns):
+    def __init__(self, scale, patterns, octave=4, bpm=108):
         self.scale = scale
         self.patterns = patterns
+        self.bpm = bpm
+        self.octave = octave
 
-    def notes(self, octave=4):
-        scale = self.scale.transpose(12 * octave)
-        for pattern in self.patterns:
-            base = pattern['start']
-            for bar in range(pattern['bars']):
-                current = base + pattern['delta'] * bar
-                for delta in pattern['notes']:
-                    current += delta
-                    yield scale[current]
+    def __iter__(self):
+        time = 0
+        duration = self.note_duration
+        scale = self.scale.transpose(12 * self.octave)
 
-    def fingers(self, hand='right'):
         for pattern in self.patterns:
+            base_step = pattern['start']
+            notes_fingers = list(zip(
+                    pattern['notes'],
+                    pattern['fingers']['left'],
+                    pattern['fingers']['right']))
+
             for bar in range(pattern['bars']):
-                for finger in pattern['fingers'][hand]:
-                    yield finger
+                current_step = base_step + pattern['delta'] * bar
+                for step_delta, lf, rf in notes_fingers:
+                    current_step += step_delta
+                    note_num = scale[current_step]
+
+                    lnote = Note(time, duration, note_num - 12, finger=lf)
+                    rnote = Note(time, duration, note_num, finger=rf)
+                    time += duration
+
+                    yield (lnote, rnote)
+
+    @property
+    def note_duration(self):
+        return (60 / self.bpm) / 4
+
+    def match(self, notes):
+        matches = [(NoteMatch(ln), NoteMatch(rn)) for ln, rn in self]
+        extras = []
+
+        for note in sorted(notes, key=lambda n: n.time):
+            bucket = note.time // self.note_duration
+            start = int(max(0, bucket - 2))
+            end = int(min(len(matches), bucket + 3))
+
+            matched = False
+            for match_pair in matches[start:end]:
+                for match in match_pair:
+                    if match.expected.is_double(note):
+                        match.actual = note
+                        matched = True
+
+            if not matched:
+                extras.append(note)
+
+        return (matches, extras)
+
+
+class NoteMatch(object):
+    def __init__(self, expected, actual=None):
+        self.expected = expected
+        self.actual = actual
+
+    def __str__(self):
+        return 'NoteMatch({} >< {})'.format(self.expected, self.actual)
 
 
 class Note(object):
-    def __init__(self, note_on, note_off):
-        self.time = note_on.time
-        self.duration = note_off.time - note_on.time
-        self.note = note_on.note
-        self.velocity = note_on.velocity
+    @classmethod
+    def from_midi(cls, note_on, note_off):
+        return cls(
+            time=note_on.time,
+            duration=note_off.time - note_on.time,
+            note=note_on.note,
+            velocity=note_on.velocity)
+
+    def __init__(self, time, duration, note, velocity=64, finger=None):
+        self.time = time
+        self.duration = duration
+        self.note = note
+        self.velocity = velocity
+        self.finger = finger
 
         self.name = NOTE_NAMES[self.note % 12]
         self.octave = self.note // 12
 
-    def is_pair(self, other, window=BEAT_TIME/4):
-        return self.name == other.name and abs(self.time - other.time) < window
+    def is_double(self, other):
+        return self.note == other.note and abs(self.time - other.time) < self.duration
 
     def __str__(self):
-        return '{0.time:.5f} {0.name}{0.octave} {0.velocity} [{0.duration:.3f}]'.format(self)
+        return '{0.time:.4f} {0.name}{0.octave} {0.velocity} [{0.duration:.3f}]'.format(self)
 
 
 class RecordPort(object):
@@ -151,31 +201,9 @@ def oneshot_record(port):
             active_notes[msg.note] = msg
         elif msg.type == 'note_off':
             on_msg = active_notes.pop(msg.note)
-            notes.append(Note(on_msg, msg))
+            notes.append(Note.from_midi(on_msg, msg))
 
     return sorted(notes, key=lambda n: n.time)
-
-
-def pair_notes(notes):
-    pairs = []
-    outliers = []
-
-    paired = set()
-    for i, note in enumerate(notes):
-        if note in paired:
-            continue
-
-        try:
-            other = next(n for n in notes[i+1:] if n not in paired and note.is_pair(n))
-            paired.add(other)
-            if note.note < other.note:
-                pairs.append((note, other))
-            else:
-                pairs.append((other, other))
-        except StopIteration:
-            outliers.append(note)
-
-    return (pairs, outliers)
 
 
 def pair_stats(pairs):
@@ -192,7 +220,12 @@ def pair_stats(pairs):
 
     return stats
 
+
 if __name__ == '__main__':
+    # portmidi seems to have weird buffering problems
+    mido.set_backend('mido.backends.rtmidi')
+
+    exercises = load_exercises()
     interfaces = mido.get_input_names()
 
     print('---')
@@ -203,23 +236,31 @@ if __name__ == '__main__':
         notes = oneshot_record(RecordPort(port))
         print('done ({} notes)'.format(len(notes)))
 
-    pairs, outliers = pair_notes(notes)
-    stats = pair_stats(pairs)
+    matches, extras = exercises[0].match(notes)
 
     print()
-    print('{} unpaired notes'.format(len(outliers)))
-    for note in outliers:
+    print('{} unmatched notes'.format(len(extras)))
+    for note in extras:
         print('  {}'.format(note))
 
-    print('---')
-    print('avg spread: {:.4f}'.format(mean(s['spread'] for s in stats)))
-    print('avg right offset: {:.4f}'.format(mean(s['r_offset'] for s in stats)))
-    print('avg left offset: {:.4f}'.format(mean(s['l_offset'] for s in stats)))
+    print()
+    for match in matches:
+        print('L: {0}, R: {1}'.format(*match))
 
-    print('---')
-    print('avg velocity: {:.2f}'.format(mean(n.velocity for n in notes)))
-    print('velocity variance: {:.2f}'.format(pvariance(n.velocity for n in notes)))
-
-    print('---')
-    print('avg duration: {:.4f} (target = {:.4f})'.format(mean(n.duration for n in notes), BEAT_TIME/4))
-    print('duration variance: {:.4f}'.format(pvariance(n.duration for n in notes)))
+    # median, avg, and min/max velocities
+    #  - total
+    #  - per exercise
+    #  - per finger
+    # avg, min/max spread between left+right
+    #  - total
+    #  - per exercise
+    #  - per finger
+    # median, avg, min/max offset from beat
+    #  - total
+    #  - per hand
+    #  - per exercise
+    #  - per finger
+    # median, avg, min/max duration
+    #  - total
+    #  - per exercise
+    #  - per finger
