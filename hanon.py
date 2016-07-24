@@ -4,8 +4,8 @@ import json
 import mido
 import time
 
-from itertools import accumulate
-from statistics import mean, pvariance
+from itertools import accumulate, chain
+from statistics import mean, pvariance, median
 
 NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
@@ -126,6 +126,18 @@ class NoteMatch(object):
         self.expected = expected
         self.actual = actual
 
+    def finger(self):
+        return self.expected.finger
+
+    def is_match(self):
+        return self.actual is not None
+
+    def delay(self):
+        return self.actual.time - self.expected.time
+
+    def space(self):
+        return self.expected.duration - self.actual.duration
+
     def __str__(self):
         return 'NoteMatch({} >< {})'.format(self.expected, self.actual)
 
@@ -153,7 +165,7 @@ class Note(object):
         return self.note == other.note and abs(self.time - other.time) < self.duration
 
     def __str__(self):
-        return '{0.time:.4f} {0.name}{0.octave} {0.velocity} [{0.duration:.3f}]'.format(self)
+        return '{0.time:.4f} {0.name}{0.octave} {0.velocity} [{0.duration:.4f}]'.format(self)
 
 
 class RecordPort(object):
@@ -210,19 +222,25 @@ def oneshot_record(port):
     return sorted(notes, key=lambda n: n.time)
 
 
-def pair_stats(pairs):
-    stats = []
+def group_by_finger(hand_matches):
+    groups = {}
+    for m in hand_matches:
+        groups.setdefault(m.finger(), []).append(m)
+    return groups
 
-    expected_time = 0
-    for left, right in pairs:
-        stats.append({
-            'spread': right.time - left.time,
-            'r_offset': right.time - expected_time,
-            'l_offset': left.time - expected_time
-        })
-        expected_time += BEAT_TIME/4
 
-    return stats
+def split_filter_matches(matches):
+    left, right = zip(*matches)
+    return ([m for m in left if m.is_match()],
+            [m for m in right if m.is_match()])
+
+
+def print_delay_stats(matches, header='== delay ==', indent=0):
+    delays = [m.delay() for m in matches]
+    print('{}{}'.format(' ' * indent, header))
+    print('{}avg: {:.4f}'.format(' ' * indent, mean(delays)))
+    print('{}med: {:.4f}'.format(' ' * indent, median(delays)))
+
 
 
 if __name__ == '__main__':
@@ -242,14 +260,27 @@ if __name__ == '__main__':
 
     matches, extras, notes = exercises[0].match(notes)
 
+    left_matches, right_matches = split_filter_matches(matches)
+    left_fingers = group_by_finger(left_matches)
+    right_fingers = group_by_finger(right_matches)
+
     print()
     print('{} unmatched notes'.format(len(extras)))
     for note in extras:
         print('  {}'.format(note))
 
     print()
-    for match in matches:
-        print('L: {0}, R: {1}'.format(*match))
+    print_delay_stats(chain(left_matches, right_matches))
+
+    print()
+    print_delay_stats(left_matches, header='-- left --', indent=2)
+    for f, fmatches in sorted(left_fingers.items()):
+        print_delay_stats(fmatches, header='> {}'.format(f), indent=4)
+
+    print()
+    print_delay_stats(right_matches, header='-- right --', indent=2)
+    for f, fmatches in sorted(right_fingers.items()):
+        print_delay_stats(fmatches, header='> {}'.format(f), indent=4)
 
     # median, avg, and min/max velocities
     #  - total
@@ -257,11 +288,6 @@ if __name__ == '__main__':
     #  - per finger
     # avg, min/max spread between left+right
     #  - total
-    #  - per exercise
-    #  - per finger
-    # median, avg, min/max offset from beat
-    #  - total
-    #  - per hand
     #  - per exercise
     #  - per finger
     # median, avg, min/max duration
