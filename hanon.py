@@ -99,10 +99,14 @@ class Exercise(object):
         matches = [(NoteMatch(ln), NoteMatch(rn)) for ln, rn in self]
         extras = []
 
-        for note in sorted(notes, key=lambda n: n.time):
+        notes = sorted(notes, key=lambda n: n.time)
+        for i, note in enumerate(notes):
             bucket = note.time // self.note_duration
             start = int(max(0, bucket - 2))
             end = int(min(len(matches), bucket + 3))
+
+            if bucket >= len(matches):
+                break
 
             matched = False
             for match_pair in matches[start:end]:
@@ -114,7 +118,7 @@ class Exercise(object):
             if not matched:
                 extras.append(note)
 
-        return (matches, extras)
+        return (matches, extras, notes[i:])
 
 
 class NoteMatch(object):
@@ -236,7 +240,7 @@ if __name__ == '__main__':
         notes = oneshot_record(RecordPort(port))
         print('done ({} notes)'.format(len(notes)))
 
-    matches, extras = exercises[0].match(notes)
+    matches, extras, notes = exercises[0].match(notes)
 
     print()
     print('{} unmatched notes'.format(len(extras)))
