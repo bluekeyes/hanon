@@ -235,12 +235,51 @@ def split_filter_matches(matches):
             [m for m in right if m.is_match()])
 
 
-def print_delay_stats(matches, header='== delay ==', indent=0):
+def compute_delay(matches):
     delays = [m.delay() for m in matches]
-    print('{}{}'.format(' ' * indent, header))
-    print('{}avg: {:.4f}'.format(' ' * indent, mean(delays)))
-    print('{}med: {:.4f}'.format(' ' * indent, median(delays)))
+    return {
+        'avg': mean(delays),
+        'med': median(delays)
+    }
 
+
+def compute_velocity(matches):
+    velocities = [m.actual.velocity for m in matches]
+    return {
+        'avg': mean(velocities),
+        'med': median(velocities)
+    }
+
+
+class StatPrinter(object):
+    def __init__(self, raw_matches):
+        left, right = split_filter_matches(raw_matches)
+        self.all = list(chain(left, right))
+
+        self.left = left
+        self.left_fingers = group_by_finger(left)
+
+        self.right = right
+        self.right_fingers = group_by_finger(right)
+
+    def print(self, name, computer):
+        print('== {} =='.format(name))
+        self._print_stats(computer(self.all))
+
+        for hand in ('left', 'right'):
+            hand_matches = getattr(self, hand)
+            self._print_stats(computer(hand_matches), header='-- {} --'.format(hand), indent=2)
+
+            matches_by_finger = getattr(self, '{}_fingers'.format(hand))
+            for f, matches in (matches_by_finger.items()):
+                self._print_stats(computer(matches), header='> {}'.format(f), indent=4)
+
+    def _print_stats(self, stats, header=None, indent=0):
+        ispace = ' ' * indent
+        if header is not None:
+            print('{}{}'.format(ispace, header))
+        for name, value in sorted(stats.items()):
+            print('{}{}: {:.4f}'.format(ispace, name, value))
 
 
 if __name__ == '__main__':
@@ -260,32 +299,19 @@ if __name__ == '__main__':
 
     matches, extras, notes = exercises[0].match(notes)
 
-    left_matches, right_matches = split_filter_matches(matches)
-    left_fingers = group_by_finger(left_matches)
-    right_fingers = group_by_finger(right_matches)
-
     print()
     print('{} unmatched notes'.format(len(extras)))
     for note in extras:
         print('  {}'.format(note))
 
-    print()
-    print_delay_stats(chain(left_matches, right_matches))
+    printer = StatPrinter(matches)
 
     print()
-    print_delay_stats(left_matches, header='-- left --', indent=2)
-    for f, fmatches in sorted(left_fingers.items()):
-        print_delay_stats(fmatches, header='> {}'.format(f), indent=4)
+    printer.print('delay', compute_delay)
 
     print()
-    print_delay_stats(right_matches, header='-- right --', indent=2)
-    for f, fmatches in sorted(right_fingers.items()):
-        print_delay_stats(fmatches, header='> {}'.format(f), indent=4)
+    printer.print('velocity', compute_velocity)
 
-    # median, avg, and min/max velocities
-    #  - total
-    #  - per exercise
-    #  - per finger
     # avg, min/max spread between left+right
     #  - total
     #  - per exercise
