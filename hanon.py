@@ -169,18 +169,22 @@ class Note(object):
 
 
 class RecordPort(object):
-    def __init__(self, port, idle_time=5):
+    def __init__(self, port, channel=0, idle_time=5):
         self.port = port
+        self.channel = channel
         self.idle_time = idle_time
 
         self._last_event = 0
 
     def receive(self, block=True):
-        msg = self.port.receive(block=block)
-        if msg:
-            msg.time = time.perf_counter()
-            self._last_event = msg.time
-        return msg
+        while True:
+            msg = self.port.receive(block=block)
+            if msg and msg.channel == self.channel:
+                msg.time = time.perf_counter()
+                self._last_event = msg.time
+                return msg
+            elif not block:
+                return None
 
     def receive_first(self, type=None):
         while True:
