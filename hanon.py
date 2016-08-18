@@ -61,14 +61,27 @@ SCALES = {
 
 
 class Exercise(object):
-    def __init__(self, scale, patterns, octave=4, bpm=108):
+    def __init__(self, scale, patterns, start=0, octave=4, bpm=108):
         self.scale = scale
         self.patterns = patterns
-        self.bpm = bpm
+
+        self.start = start
         self.octave = octave
+        self.bpm = bpm
+
+    @property
+    def note_duration(self):
+        return (60 / self.bpm) / 4
+
+    @property
+    def duration(self):
+        return self.note_duration * len(self)
+
+    def __len__(self):
+        return sum(len(p['notes']) * p['bars'] for p in self.patterns)
 
     def __iter__(self):
-        time = 0
+        time = self.start
         duration = self.note_duration
         scale = self.scale.transpose(12 * self.octave)
 
@@ -91,31 +104,31 @@ class Exercise(object):
 
                     yield (lnote, rnote)
 
-    @property
-    def note_duration(self):
-        return (60 / self.bpm) / 4
+    def shift(self, delta):
+        return Exercise(self.scale, self.patterns, self.start + delta, self.octave, self.bpm)
 
     def match(self, notes):
         matches = [(NoteMatch(ln), NoteMatch(rn)) for ln, rn in self]
         extras = []
 
+        def find_match(note, start, end):
+            for match_pair in matches[start:end]:
+                for match in match_pair:
+                    if match.expected.is_double(note):
+                        match.actual = note
+                        return True
+            return False
+
         notes = sorted(notes, key=lambda n: n.time)
         for i, note in enumerate(notes):
-            bucket = note.time // self.note_duration
+            bucket = (note.time - self.start) // self.note_duration
             start = int(max(0, bucket - 2))
             end = int(min(len(matches), bucket + 3))
 
             if bucket >= len(matches):
                 break
 
-            matched = False
-            for match_pair in matches[start:end]:
-                for match in match_pair:
-                    if match.expected.is_double(note):
-                        match.actual = note
-                        matched = True
-
-            if not matched:
+            if not find_match(note, start, end):
                 extras.append(note)
 
         return (matches, extras, notes[i:])
@@ -301,20 +314,36 @@ if __name__ == '__main__':
         notes = oneshot_record(RecordPort(port))
         print('done ({} notes)'.format(len(notes)))
 
-    matches, extras, notes = exercises[0].match(notes)
+    with open('recording.pickle', 'wb') as f:
+        import pickle
+        pickle.dump(notes, f)
 
-    print()
-    print('{} unmatched notes'.format(len(extras)))
-    for note in extras:
-        print('  {}'.format(note))
+    # with open('recording.pickle', 'rb') as f:
+    #     import pickle
+    #     notes = pickle.load(f)
 
-    printer = StatPrinter(matches)
+    elapsed = 0
+    for i, exercise in enumerate(exercises):
+        print()
+        print('Execise #{}'.format(i + 1))
+        print()
 
-    print()
-    printer.print('delay', compute_delay)
+        exercise = exercise.shift(elapsed)
+        elapsed += exercise.duration
 
-    print()
-    printer.print('velocity', compute_velocity)
+        matches, extras, notes = exercise.match(notes)
+
+        print('{} unmatched notes'.format(len(extras)))
+        for note in extras:
+            print('  {}'.format(note))
+
+        printer = StatPrinter(matches)
+
+        print()
+        printer.print('delay', compute_delay)
+
+        print()
+        printer.print('velocity', compute_velocity)
 
     # avg, min/max spread between left+right
     #  - total
