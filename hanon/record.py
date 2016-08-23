@@ -11,6 +11,10 @@ class RecordPort(object):
 
         self._last_event = 0
 
+    def flush(self):
+        while self.port.receive(block=False):
+            pass
+
     def receive(self, block=True):
         while True:
             msg = self.port.receive(block=block)
@@ -51,6 +55,7 @@ def oneshot_record(port):
     notes = []
     active_notes = {}
 
+    port.flush()
     for msg in port:
         if msg.type == 'note_on':
             active_notes[msg.note] = msg
