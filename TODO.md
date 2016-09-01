@@ -1,6 +1,6 @@
 TODO
 ====
 
-- Add BPM option to CLI
+- Implement exercise filtering in CLI
 - Implement analysis feature in CLI
 - Created better statistics list

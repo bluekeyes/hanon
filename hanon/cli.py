@@ -67,6 +67,7 @@ def create_parser():
             """)
 
     parser.add_argument('-e', '--exercises', help='comma-separated list of expected excercises')
+    parser.add_argument('-b', '--bpm', help='expected beats per minute', default=108)
 
     parser.add_argument('-i', '--interface', help='MIDI interface to record')
     parser.add_argument('-c', '--channel', help='MIDI channel to record', default=0)
@@ -108,8 +109,10 @@ def main():
     with open(recording, 'wb') as f:
         pickle.dump(notes, f)
 
+    exercises_path = os.path.join(os.path.dirname(__file__), 'exercises.json')
+    exercises = load_exercises(exercises_path, args.bpm)
+
     elapsed = 0
-    exercises = load_exercises(os.path.join(os.path.dirname(__file__), 'exercises.json'))
     for i, exercise in enumerate(exercises):
         print()
         print('Execise #{}'.format(i + 1))

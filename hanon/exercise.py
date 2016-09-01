@@ -8,10 +8,10 @@ SCALES = {
 }
 
 
-def load_exercises(path='exercises.json'):
+def load_exercises(path, bpm):
     def as_exercise(obj):
         if 'scale' in obj and 'patterns' in obj:
-            return Exercise(SCALES[obj['scale']], obj['patterns'])
+            return Exercise(SCALES[obj['scale']], obj['patterns'], bpm=bpm)
         return obj
 
     with open(path, 'r') as f:
