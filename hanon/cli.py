@@ -20,10 +20,12 @@ def prompt_interfaces(interfaces):
     print_interfaces(interfaces, number=True)
     print()
 
+    index = -1
     while True:
         selection = input('Selected interface [1]: ')
         if not selection:
-            return interfaces[0]
+            index = 0
+            break
 
         try:
             index = int(selection) - 1
@@ -31,7 +33,10 @@ def prompt_interfaces(interfaces):
             index = -1
 
         if 0 <= index < len(interfaces):
-            return interfaces[index]
+            break
+
+    print()
+    return interfaces[index]
 
 
 def print_interfaces(interfaces, number=False):
