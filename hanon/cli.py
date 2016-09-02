@@ -66,7 +66,7 @@ def create_parser():
             about the performance are printed to the console.
             """)
 
-    parser.add_argument('-e', '--exercises', help='comma-separated list of expected excercises')
+    parser.add_argument('-e', '--exercises', help='comma-separated list of expected excercises', default='')
     parser.add_argument('-b', '--bpm', help='expected beats per minute', default=108)
 
     parser.add_argument('-i', '--interface', help='MIDI interface to record')
@@ -110,10 +110,14 @@ def main():
         pickle.dump(notes, f)
 
     exercises_path = os.path.join(os.path.dirname(__file__), 'exercises.json')
-    exercises = load_exercises(exercises_path, args.bpm)
+    exercises = enumerate(load_exercises(exercises_path, args.bpm))
+
+    selected_exercises = [int(i.strip()) for i in args.exercises.split(',') if i]
+    if len(selected_exercises) > 0:
+        exercises = [(i, e) for i, e in exercises if i in selected_exercises]
 
     elapsed = 0
-    for i, exercise in enumerate(exercises):
+    for i, exercise in exercises:
         print()
         print('Execise #{}'.format(i + 1))
         print()
