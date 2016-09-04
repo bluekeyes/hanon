@@ -72,11 +72,11 @@ def create_parser():
             """)
 
     parser.add_argument('-e', '--exercises', help='comma-separated list of expected excercises', default='')
-    parser.add_argument('-b', '--bpm', help='expected beats per minute', default=108)
+    parser.add_argument('-b', '--bpm', help='expected beats per minute', type=int, default=108)
 
     parser.add_argument('-i', '--interface', help='MIDI interface to record')
-    parser.add_argument('-c', '--channel', help='MIDI channel to record', default=0)
-    parser.add_argument('-t', '--time', help='Seconds to wait for events before stopping', default=5)
+    parser.add_argument('-c', '--channel', help='MIDI channel to record', type=int, default=0)
+    parser.add_argument('-t', '--time', help='Seconds to wait for events before stopping', type=int, default=5)
 
     parser.add_argument('-d', '--recording-dir', help='path to recordings directory', metavar='DIR', default='./recordings')
 
