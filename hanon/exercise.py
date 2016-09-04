@@ -1,5 +1,7 @@
 import json
 
+from itertools import chain
+
 from hanon.note import Note, NoteMatch, Scale
 
 
@@ -18,7 +20,21 @@ def load_exercises(path, bpm):
         return json.load(f, object_hook=as_exercise)
 
 
-class Exercise(object):
+def match_exercises(notes, exercises):
+    results = []
+
+    elapsed = 0
+    for exercise in exercises:
+        exercise = exercise.shift(elapsed)
+        elapsed += exercise.duration
+
+        matched, notes = exercise.match(notes)
+        results.append(matched)
+
+    return results
+
+
+class Exercise:
     def __init__(self, scale, patterns, start=0, octave=4, bpm=108):
         self.scale = scale
         self.patterns = patterns
@@ -89,4 +105,32 @@ class Exercise(object):
             if not find_match(note, start, end):
                 extras.append(note)
 
-        return (matches, extras, notes[i:])
+        return (MatchedExercise(self, matches, extras), notes[i:])
+
+
+class MatchedExercise:
+    def __init__(self, exercise, matches, extras):
+        self.exercise = exercise
+        self.matches = matches
+        self.extras = extras
+
+    def all(self):
+        """Returns an iterator over all matches."""
+        return self.filter()
+
+    def fingers(self, hand=None):
+        fingers = {}
+        for m in self.filter(hand=hand):
+            fingers.setdefault(m.finger(), []).append(m)
+        return fingers
+
+    def filter(self, hand=None, fingers=(1, 2, 3, 4, 5)):
+        if hand == 'left':
+            matches = (m[0] for m in self.matches)
+        elif hand == 'right':
+            matches = (m[1] for m in self.matches)
+        else:
+            matches = chain.from_iterable(self.matches)
+
+        fingers = set(fingers)
+        return (m for m in matches if m.is_match() and m.finger() in fingers)
