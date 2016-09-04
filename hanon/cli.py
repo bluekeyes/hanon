@@ -48,7 +48,7 @@ def print_interfaces(interfaces, number=False):
 
 
 def next_recording_path(directory):
-    filename = RECORDING_PATTERN.format(date.toay(), '*')
+    filename = RECORDING_PATTERN.format(date.today(), '*')
     recordings = glob.glob(os.path.join(directory, filename))
     if len(recordings) == 0:
         next_id = 0
