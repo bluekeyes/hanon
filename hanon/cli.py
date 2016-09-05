@@ -102,14 +102,6 @@ class CliConfigError(Exception):
     pass
 
 
-class CompatUnpickler(pickle.Unpickler):
-    def find_class(self, module, name):
-        if name == 'Note':
-            return super().find_class('hanon.note', name)
-        else:
-            return super().find_class(module, name)
-
-
 def main():
     args = create_parser().parse_args()
 
@@ -126,7 +118,7 @@ def main():
 
     if args.analyze:
         with open(args.analyze, 'rb') as f:
-            notes = CompatUnpickler(f).load()
+            notes = pickle.load(f)
         return analyze(notes, exercises, graph=args.graph)
 
     interface = args.interface or prompt_interfaces(interfaces)
