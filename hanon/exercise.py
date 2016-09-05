@@ -124,7 +124,7 @@ class MatchedExercise:
             fingers.setdefault(m.finger(), []).append(m)
         return fingers
 
-    def filter(self, hand=None, fingers=(1, 2, 3, 4, 5)):
+    def filter(self, hand=None, match=True, fingers=(1, 2, 3, 4, 5)):
         if hand == 'left':
             matches = (m[0] for m in self.matches)
         elif hand == 'right':
@@ -133,4 +133,4 @@ class MatchedExercise:
             matches = chain.from_iterable(self.matches)
 
         fingers = set(fingers)
-        return (m for m in matches if m.is_match() and m.finger() in fingers)
+        return (m for m in matches if m.is_match() == match and m.finger() in fingers)

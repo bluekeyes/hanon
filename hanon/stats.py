@@ -13,10 +13,14 @@ class StatPrinter(object):
         avg_left_delay = mean(m.delay() for m in self.exercise.filter('left'))
         avg_right_delay = mean(m.delay() for m in self.exercise.filter('right'))
 
-        self._print('avg delay: {:5.2f} (left: {:5.2f}, right: {:5.2f})',
-                    1000 * avg_delay, 1000 * avg_left_delay, 1000 * avg_right_delay)
-        self._print_line()
+        self._print('extra notes: {}, missed notes: {}',
+                    len(self.exercise.extras),
+                    len(list(self.exercise.filter(match=False))))
 
+        self._print('avg delay: {:.2f} (left: {:.2f}, right: {:.2f})',
+                    1000 * avg_delay, 1000 * avg_left_delay, 1000 * avg_right_delay)
+
+        self._print_line()
         if graph:
             self._graph_by_finger(
                     'avg delay by finger',
