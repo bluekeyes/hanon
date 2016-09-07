@@ -35,7 +35,8 @@ setup(
         'hanon': ['exercises.json']
     },
     install_requires=[
-        'mido'
+        'mido',
+        'python-rtmidi'
     ],
 
     entry_points={
