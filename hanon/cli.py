@@ -98,7 +98,7 @@ def create_parser():
     return parser
 
 
-class CliConfigError(Exception):
+class ConfigError(Exception):
     pass
 
 
@@ -123,7 +123,7 @@ def main():
 
     interface = args.interface or prompt_interfaces(interfaces)
     if interface not in interfaces:
-        raise CliConfigError('interface "{}" does not exist'.format(interface))
+        raise ConfigError('interface "{}" does not exist'.format(interface))
 
     with mido.open_input(interface) as port:
         record_port = RecordPort(port, channel=args.channel, idle_time=args.time)
