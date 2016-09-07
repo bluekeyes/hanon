@@ -17,7 +17,8 @@ Exercises
 Usage
 -----
 
-To record all exercises and graph the results::
+A MIDI keyboard is required to use this tool. To record all exercises and graph
+the results::
 
     hanon -g
 
