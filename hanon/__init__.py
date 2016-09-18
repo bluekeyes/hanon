@@ -1,11 +1,11 @@
 import sys
 
 import mido
+import mido.backends.rtmidi
 
 from hanon import cli
 
 def main():
-    # portmidi seems to have weird buffering problems
     mido.set_backend('mido.backends.rtmidi')
     try:
         code = cli.main()
