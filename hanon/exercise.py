@@ -2,6 +2,7 @@ import json
 
 from itertools import chain
 
+from hanon.data import open_data
 from hanon.note import Note, NoteMatch, Scale
 
 
@@ -16,7 +17,7 @@ def load_exercises(path, bpm):
             return Exercise(SCALES[obj['scale']], obj['patterns'], bpm=bpm)
         return obj
 
-    with open(path, 'r') as f:
+    with open_data('exercises.json') as f:
         return json.load(f, object_hook=as_exercise)
 
 
