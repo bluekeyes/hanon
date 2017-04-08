@@ -52,3 +52,8 @@ coverage.xml
 .venv/
 venv/
 ENV/
+
+# nodejs / electron
+node_modules/
+yarn-debug.log
+npm-debug.log
